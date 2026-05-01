@@ -1,0 +1,17 @@
+[project]
+name = "microduck_sounds"
+version = "0.1.0"
+description = "Tiny seedable synth for microduck robot pet vocalisations."
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.21"]
+
+[project.scripts]
+microduck-sounds = "microduck_sounds.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["microduck_sounds*"]

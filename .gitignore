@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# uv / venv
+.venv/
+.python-version
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Generated audio output
+*.wav
