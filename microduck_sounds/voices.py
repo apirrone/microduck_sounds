@@ -53,7 +53,7 @@ def alarm(p: Personality, variant: int = 0) -> np.ndarray:
     t = S.t_axis(dur)
     # raised relative to this duck's center, but stays in honk range;
     # spread controls how high it climbs
-    f0 = p.pitch_center_hz * (1.25 + 0.35 * p.pitch_spread)
+    f0 = p.pitch_center_hz * (1.25 + 0.35 * p.pitch_spread) * (0.94 + 0.12 * rng.random())
     peak_mul = 1.15 + 0.25 * p.pitch_spread + 0.10 * rng.random()
     fall_mul = 0.75 + 0.20 * (1.0 - p.pitch_spread)
     freq = S.lerp(t, [(0.0, f0), (0.05 * dur, f0 * peak_mul), (dur, f0 * fall_mul)])
@@ -64,11 +64,11 @@ def alarm(p: Personality, variant: int = 0) -> np.ndarray:
     return S.normalise(sig, peak_dbfs=-3.0)
 
 
-def greet(p: Personality, variant: int = 0) -> np.ndarray:
-    rng = p.variant_rng("greet", variant)
-    dur = (0.32 + 0.25 * rng.random()) / p.speed
+def _greet_syllable(p: Personality, rng: np.random.Generator,
+                    dur_scale: float = 1.0, f0_scale: float = 1.0) -> np.ndarray:
+    dur = (0.32 + 0.25 * rng.random()) * dur_scale / p.speed
     t = S.t_axis(dur)
-    f0 = p.pitch_center_hz * (0.9 + 0.15 * rng.random())
+    f0 = p.pitch_center_hz * (0.9 + 0.15 * rng.random()) * f0_scale
     # glide_bias flips contour: positive ducks bend up, negative down
     bias = p.glide_bias
     bend = 0.10 + 0.15 * p.pitch_spread
@@ -77,7 +77,19 @@ def greet(p: Personality, variant: int = 0) -> np.ndarray:
     end = f0 * (1.0 - bias * bend * 0.3) * (0.92 + 0.08 * rng.random())
     freq = S.lerp(t, [(0.0, start), (0.18 * dur, mid), (dur, end)])
     env = S.expdecay(t, attack_s=_attack(p, dur, snappy=0.5), decay_s=dur * 0.7)
-    sig = _voice(p, t, freq, rng) * env
+    return _voice(p, t, freq, rng) * env
+
+
+def greet(p: Personality, variant: int = 0) -> np.ndarray:
+    rng = p.variant_rng("greet", variant)
+    sig = _greet_syllable(p, rng)
+    # some greets are double quacks — "wak-wak"; a mix of one- and
+    # two-syllable calls reads as much more alive than a single shape
+    if rng.random() < 0.4:
+        gap = np.zeros(int((0.05 + 0.06 * rng.random()) / p.speed * S.SR), dtype=np.float32)
+        second = _greet_syllable(p, rng, dur_scale=0.8,
+                                 f0_scale=0.95 + 0.06 * rng.random())
+        sig = np.concatenate([sig, gap, second])
     return S.normalise(sig)
 
 
@@ -132,7 +144,7 @@ def coo(p: Personality, variant: int = 0) -> np.ndarray:
     dur = (0.85 + 0.55 * rng.random()) / p.speed
     t = S.t_axis(dur)
     # well below center — drowsy ducks drop further
-    f0 = p.pitch_center_hz * (0.42 + 0.15 * (1 - p.attack_sharpness))
+    f0 = p.pitch_center_hz * (0.42 + 0.15 * (1 - p.attack_sharpness)) * (0.94 + 0.12 * rng.random())
     drift_a = 1.0 + 0.05 * rng.random() + 0.04 * p.glide_bias
     freq = S.lerp(t, [(0.0, f0 * 0.94), (dur * 0.5, f0 * drift_a), (dur, f0 * 0.90)])
     env = S.bell(t, attack_s=dur * (0.18 + 0.10 * (1 - p.attack_sharpness)),
@@ -157,11 +169,14 @@ RECIPES = {
     "coo": coo,
 }
 
+# The runtime picks a random variant at play time, so more variants
+# directly means a more organic-feeling duck. chirp (mouth trigger) and
+# greet (wake-up) are the most-heard tags, so they get the most.
 VARIANT_COUNT = {
-    "alarm": 2,
-    "greet": 3,
-    "inquire": 2,
-    "peck": 2,
-    "chirp": 3,
-    "coo": 2,
+    "alarm": 10,
+    "greet": 12,
+    "inquire": 10,
+    "peck": 10,
+    "chirp": 12,
+    "coo": 10,
 }
