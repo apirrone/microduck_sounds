@@ -62,18 +62,17 @@ def render_all(seed: SeedLike, out_dir: Union[str, Path]) -> list[Path]:
 _PLAYERS = ("aplay", "paplay", "ffplay", "mpv")
 
 
-def _wav_bytes(buffer: np.ndarray) -> bytes:
+def _wav_bytes(buffer: np.ndarray, sr: int = S.SR) -> bytes:
     pcm = S.to_int16(buffer).tobytes()
     header = b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVE"
-    fmt = b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, S.SR, S.SR * 2, 2, 16)
+    fmt = b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16)
     data = b"data" + struct.pack("<I", len(pcm)) + pcm
     return header + fmt + data
 
 
-def play(tag: str, seed: SeedLike, variant: int = 0) -> None:
-    """Synthesize and play immediately. Tries aplay/paplay/ffplay/mpv."""
-    buf = render(tag, seed, variant=variant)
-    payload = _wav_bytes(buf)
+def play_buffer(buffer: np.ndarray, sr: int = S.SR) -> None:
+    """Play a float32 buffer immediately. Tries aplay/paplay/ffplay/mpv."""
+    payload = _wav_bytes(buffer, sr=sr)
     for player in _PLAYERS:
         if shutil.which(player) is None:
             continue
@@ -88,3 +87,8 @@ def play(tag: str, seed: SeedLike, variant: int = 0) -> None:
         subprocess.run(cmd, input=payload, check=True)
         return
     raise RuntimeError(f"no audio player found (tried {_PLAYERS})")
+
+
+def play(tag: str, seed: SeedLike, variant: int = 0) -> None:
+    """Synthesize and play immediately."""
+    play_buffer(render(tag, seed, variant=variant))
