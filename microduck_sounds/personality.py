@@ -26,7 +26,7 @@ class Personality:
 
     # --- timbre ---
     brightness: float            # 0..1, harmonic rolloff (1 = bright/buzzy)
-    tilt: float                  # 1.0..2.5, exponent on harmonic decay (higher = darker)
+    tilt: float                  # 1.4..2.8, exponent on harmonic decay (higher = darker)
     nasal: float                 # 0..1, emphasis on 2nd/3rd harmonic
     harmonic_skew: float         # -1..+1, negative = odd-only (square-ish), positive = even-leaning
     formant_n: int               # 1..5, which harmonic the formant boosts
@@ -37,10 +37,10 @@ class Personality:
     vibrato_depth: float         # 0..0.7 semitones
     jitter_depth: float          # 0..0.4 semitones, random pitch wobble
     breath: float                # 0..0.35, noise mix
-    quackiness: float            # 0..1, blends pure-tone vs am-buzz
-    am_rate_hz: float            # 28..85, quack-buzz rate (only matters with quackiness > 0)
+    quackiness: float            # 0.2..1, blends pure-tone vs am-buzz
+    am_rate_hz: float            # 18..55, quack/croak-buzz rate (only matters with quackiness > 0)
     am_depth: float              # 0..0.7, modulation depth
-    warble_hz: float             # 8..30, fast trill on chirp
+    warble_hz: float             # 7..18, trill on chirp
     warble_depth: float          # 0..1.5 semitones
 
     # --- timing ---
@@ -52,10 +52,11 @@ class Personality:
         rng = np.random.default_rng(int(seed) & 0xFFFFFFFF)
         u = rng.uniform
 
-        # Bimodal-ish register: some ducks tiny & high, some big & low.
+        # Bimodal-ish register: some ducks smaller & higher, some big & low —
+        # but the whole population sits low, duck/toad territory.
         register = float(rng.choice([-1, 0, 0, 1])) + float(u(-0.4, 0.4))
-        base = float(u(280.0, 620.0))
-        pitch = float(np.clip(base * (2.0 ** (register * 0.45)), 180.0, 1100.0))
+        base = float(u(160.0, 380.0))
+        pitch = float(np.clip(base * (2.0 ** (register * 0.45)), 110.0, 620.0))
 
         return cls(
             seed=int(seed),
@@ -64,8 +65,8 @@ class Personality:
             pitch_spread=float(u(0.4, 1.2)),
             glide_bias=float(u(-1.0, 1.0)),
 
-            brightness=float(u(0.15, 0.95)),
-            tilt=float(u(1.0, 2.5)),
+            brightness=float(u(0.05, 0.55)),
+            tilt=float(u(1.4, 2.8)),
             nasal=float(u(0.1, 1.0)),
             harmonic_skew=float(u(-1.0, 1.0)),
             formant_n=int(rng.integers(1, 6)),
@@ -75,10 +76,10 @@ class Personality:
             vibrato_depth=float(u(0.0, 0.7)),
             jitter_depth=float(u(0.03, 0.35)),
             breath=float(u(0.0, 0.30)),
-            quackiness=float(u(0.0, 1.0)),
-            am_rate_hz=float(u(28.0, 85.0)),
-            am_depth=float(u(0.10, 0.70)),
-            warble_hz=float(u(8.0, 28.0)),
+            quackiness=float(u(0.2, 1.0)),
+            am_rate_hz=float(u(18.0, 55.0)),
+            am_depth=float(u(0.15, 0.70)),
+            warble_hz=float(u(7.0, 18.0)),
             warble_depth=float(u(0.0, 1.4)),
 
             attack_sharpness=float(u(0.0, 1.0)),

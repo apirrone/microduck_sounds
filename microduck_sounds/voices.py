@@ -51,15 +51,16 @@ def alarm(p: Personality, variant: int = 0) -> np.ndarray:
     rng = p.variant_rng("alarm", variant)
     dur = (0.20 + 0.12 * rng.random()) / p.speed
     t = S.t_axis(dur)
-    # high relative to this duck's center; spread controls how high it climbs
-    f0 = p.pitch_center_hz * (1.6 + 0.7 * p.pitch_spread)
+    # raised relative to this duck's center, but stays in honk range;
+    # spread controls how high it climbs
+    f0 = p.pitch_center_hz * (1.25 + 0.35 * p.pitch_spread)
     peak_mul = 1.15 + 0.25 * p.pitch_spread + 0.10 * rng.random()
     fall_mul = 0.75 + 0.20 * (1.0 - p.pitch_spread)
     freq = S.lerp(t, [(0.0, f0), (0.05 * dur, f0 * peak_mul), (dur, f0 * fall_mul)])
     env = S.expdecay(t, attack_s=_attack(p, dur, snappy=1.0), decay_s=dur * (0.40 + 0.20 * rng.random()))
     sig = _voice(p, t, freq, rng, am_scale=0.5) * env
-    # crackle scales with brightness — bright ducks shriek, soft ducks just yelp
-    sig += (0.10 + 0.20 * p.brightness) * rng.standard_normal(len(t)).astype(np.float32) * env
+    # crackle scales with brightness — bright ducks rasp, soft ducks just yelp
+    sig += (0.04 + 0.10 * p.brightness) * rng.standard_normal(len(t)).astype(np.float32) * env
     return S.normalise(sig, peak_dbfs=-3.0)
 
 
@@ -113,7 +114,7 @@ def chirp(p: Personality, variant: int = 0) -> np.ndarray:
     rng = p.variant_rng("chirp", variant)
     dur = (0.10 + 0.13 * rng.random()) / p.speed
     t = S.t_axis(dur)
-    f0 = p.pitch_center_hz * (1.8 + 0.7 * rng.random())
+    f0 = p.pitch_center_hz * (1.2 + 0.4 * rng.random())
     # warble: rapid trill, depth & rate are personality-driven
     warble = S.vibrato(t, p.warble_hz, p.warble_depth, phase=float(rng.uniform(0, 6.28)))
     bend = S.lerp(t, [(0.0, 0.97), (0.4 * dur, 1.08 + 0.10 * rng.random()), (dur, 1.00)])
