@@ -10,7 +10,9 @@ enough to make two seeds feel like different creatures.
 """
 from __future__ import annotations
 
+import zlib
 from dataclasses import dataclass
+
 import numpy as np
 
 
@@ -87,8 +89,12 @@ class Personality:
         )
 
     def variant_rng(self, tag: str, variant: int) -> np.random.Generator:
-        """Stable per-(seed, tag, variant) RNG for sub-randomisation."""
-        h = (self.seed * 1_000_003) ^ (hash(tag) & 0xFFFFFFFF) ^ (variant * 2654435761)
+        """Stable per-(seed, tag, variant) RNG for sub-randomisation.
+
+        crc32, not hash(): str hashing is salted per process, which would
+        re-roll every variant on each regeneration of the bank.
+        """
+        h = (self.seed * 1_000_003) ^ zlib.crc32(tag.encode()) ^ (variant * 2654435761)
         return np.random.default_rng(h & 0xFFFFFFFF)
 
     def harmonics(self) -> list[float]:

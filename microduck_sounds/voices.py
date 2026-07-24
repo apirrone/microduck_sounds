@@ -122,20 +122,49 @@ def peck(p: Personality, variant: int = 0) -> np.ndarray:
     return S.normalise(body)
 
 
-def chirp(p: Personality, variant: int = 0) -> np.ndarray:
-    rng = p.variant_rng("chirp", variant)
-    dur = (0.10 + 0.13 * rng.random()) / p.speed
+def _chirp_syllable(p: Personality, rng: np.random.Generator, f0: float,
+                    dur: float, contour: list[tuple[float, float]]) -> np.ndarray:
     t = S.t_axis(dur)
-    f0 = p.pitch_center_hz * (1.2 + 0.4 * rng.random())
     # warble: rapid trill, depth & rate are personality-driven
     warble = S.vibrato(t, p.warble_hz, p.warble_depth, phase=float(rng.uniform(0, 6.28)))
-    bend = S.lerp(t, [(0.0, 0.97), (0.4 * dur, 1.08 + 0.10 * rng.random()), (dur, 1.00)])
-    freq = f0 * bend * warble
+    freq = f0 * S.lerp(t, contour) * warble
     env = S.expdecay(t, attack_s=_attack(p, dur, snappy=0.7), decay_s=dur * 0.55)
     # softer than greet: gut quackiness and brightness
     p_soft = replace(p, quackiness=p.quackiness * 0.2, brightness=p.brightness * 0.5,
                      formant_gain=p.formant_gain * 0.5)
-    sig = _voice(p_soft, t, freq, rng, breath_scale=0.4) * env
+    return _voice(p_soft, t, freq, rng, breath_scale=0.4) * env
+
+
+def chirp(p: Personality, variant: int = 0) -> np.ndarray:
+    """Mouth-trigger sound. Variants cycle four distinct shapes — rise,
+    fall, trill, double — so random picks are heard as different calls,
+    not re-rolls of the same blip.
+    """
+    rng = p.variant_rng("chirp", variant)
+    shape = variant % 4
+    f0 = p.pitch_center_hz * (0.95 + 0.75 * rng.random())
+    if shape == 0:  # rising blip
+        dur = (0.10 + 0.10 * rng.random()) / p.speed
+        sig = _chirp_syllable(p, rng, f0, dur,
+                              [(0.0, 0.88), (0.5 * dur, 1.12 + 0.10 * rng.random()), (dur, 1.05)])
+    elif shape == 1:  # falling blip
+        dur = (0.10 + 0.10 * rng.random()) / p.speed
+        sig = _chirp_syllable(p, rng, f0, dur,
+                              [(0.0, 1.12 + 0.10 * rng.random()), (0.3 * dur, 1.0), (dur, 0.78)])
+    elif shape == 2:  # trill — longer, warble cranked up
+        dur = (0.22 + 0.14 * rng.random()) / p.speed
+        p_trill = replace(p, warble_depth=max(p.warble_depth, 0.7) * 1.6)
+        sig = _chirp_syllable(p_trill, rng, f0, dur,
+                              [(0.0, 1.0), (0.5 * dur, 1.06), (dur, 0.94)])
+    else:  # double "wek-wek"
+        dur = (0.08 + 0.05 * rng.random()) / p.speed
+        a = _chirp_syllable(p, rng, f0, dur,
+                            [(0.0, 0.95), (0.4 * dur, 1.10), (dur, 0.88)])
+        gap = np.zeros(int((0.03 + 0.03 * rng.random()) / p.speed * S.SR), dtype=np.float32)
+        dur_b = dur * 0.9
+        b = _chirp_syllable(p, rng, f0 * (0.92 + 0.10 * rng.random()), dur_b,
+                            [(0.0, 0.95), (0.4 * dur_b, 1.10), (dur_b, 0.88)])
+        sig = np.concatenate([a, gap, b])
     return S.normalise(sig, peak_dbfs=-6.0)
 
 
