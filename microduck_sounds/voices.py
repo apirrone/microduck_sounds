@@ -189,6 +189,67 @@ def coo(p: Personality, variant: int = 0) -> np.ndarray:
     return S.normalise(sig, peak_dbfs=-5.0)
 
 
+def wheee_segments(p: Personality, variant: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(start, loop, end) for the held-trigger joy ride on roller blades.
+
+    Rendered as ONE continuous master and sliced, so jitter / breath /
+    wobble carry across the start→loop cut with no seam. The loop file's
+    tail is then crossfaded onto the sample just before the loop start,
+    so playing it back-to-back wraps without a click. The end segment
+    has its own onset (a little flick up, then the fall) because the
+    player may leave the loop at any point.
+    """
+    rng = p.variant_rng("wheee", variant)
+    d_start = (0.80 + 0.30 * rng.random()) / p.speed
+    d_loop = (1.60 + 0.60 * rng.random()) / p.speed
+    d_end = (0.55 + 0.25 * rng.random()) / p.speed
+    total = d_start + d_loop + d_end
+    t = S.t_axis(total)
+    t1, t2 = d_start, d_start + d_loop
+
+    f0 = p.pitch_center_hz * (0.95 + 0.10 * rng.random())
+    # how high the ride goes — spread-y ducks scream higher
+    top = 1.6 + 0.5 * p.pitch_spread + 0.25 * rng.random()
+    freq = S.lerp(t, [(0.0, f0 * 0.85),
+                      (0.15 * d_start, f0),
+                      (t1, f0 * top),
+                      (t2, f0 * top),
+                      (t2 + 0.25 * d_end, f0 * top * 1.04),
+                      (total, f0 * 0.60)])
+    # excitement wobble, swelling as the ride picks up speed, steady in the loop
+    wob_hz = 4.5 + 3.0 * rng.random()
+    swell = S.lerp(t, [(0.0, 0.15), (t1, 1.0), (total, 1.0)])
+    freq = freq * (2.0 ** (0.5 * swell * np.sin(2 * np.pi * wob_hz * t) / 12.0))
+
+    env = S.lerp(t, [(0.0, 0.0), (min(0.06, 0.5 * d_start), 1.0),
+                     (t2 + 0.40 * d_end, 1.0), (total, 0.0)])
+    # the wobble replaces vibrato; less buzz so the glide stays clean
+    p_joy = replace(p, vibrato_depth=p.vibrato_depth * 0.5,
+                    quackiness=p.quackiness * 0.5)
+    sig = _voice(p_joy, t, freq, rng, am_scale=0.5, breath_scale=0.5) * env
+    # normalise the master, THEN slice — segment levels must match
+    sig = S.normalise(sig, peak_dbfs=-4.0)
+
+    n1, n2 = int(t1 * S.SR), int(t2 * S.SR)
+    start, loop, end = sig[:n1].copy(), sig[n1:n2].copy(), sig[n2:].copy()
+    # crossfade the loop tail onto the master just before the loop start,
+    # so loop[-1] flows into loop[0] exactly like the start flowed into it
+    nx = min(int(0.08 * S.SR), len(loop) // 2, n1)
+    w = np.linspace(0.0, 1.0, nx, dtype=np.float32)
+    loop[-nx:] = (1.0 - w) * loop[-nx:] + w * sig[n1 - nx:n1]
+    return start, loop, end
+
+
+def wheee(p: Personality, variant: int = 0) -> np.ndarray:
+    """One full ride — start, two loop passes (so the seam is auditable),
+    end. This is what `play`/`render` produce; the runtime streams the
+    segments from wheee_segments and repeats the loop while the left
+    trigger is held.
+    """
+    start, loop, end = wheee_segments(p, variant)
+    return np.concatenate([start, loop, loop, end])
+
+
 RECIPES = {
     "alarm": alarm,
     "greet": greet,
@@ -196,6 +257,7 @@ RECIPES = {
     "peck": peck,
     "chirp": chirp,
     "coo": coo,
+    "wheee": wheee,
 }
 
 # The runtime picks a random variant at play time, so more variants
@@ -208,4 +270,12 @@ VARIANT_COUNT = {
     "peck": 10,
     "chirp": 12,
     "coo": 10,
+    "wheee": 6,
+}
+
+# Tags rendered as (start, loop, end) triads instead of one-shot wavs.
+# render_all writes <tag>_start_<letter>.wav / _loop_ / _end_ for these;
+# the runtime streams start → loop×N (while held) → end.
+SEGMENTED = {
+    "wheee": wheee_segments,
 }

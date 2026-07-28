@@ -1,6 +1,6 @@
 [project]
 name = "microduck_sounds"
-version = "0.3.0"
+version = "0.4.0"
 description = "Tiny seedable synth for microduck robot pet vocalisations."
 requires-python = ">=3.9"
 dependencies = ["numpy>=1.21"]

@@ -11,7 +11,7 @@ from typing import Union
 import numpy as np
 
 from .personality import Personality
-from .voices import RECIPES, VARIANT_COUNT
+from .voices import RECIPES, SEGMENTED, VARIANT_COUNT
 from . import synth as S
 
 TAGS = list(RECIPES.keys())
@@ -53,9 +53,14 @@ def render_all(seed: SeedLike, out_dir: Union[str, Path]) -> list[Path]:
     paths = []
     for tag, n in VARIANT_COUNT.items():
         for v in range(n):
-            buf = render(tag, p, variant=v)
             letter = chr(ord("a") + v)
-            paths.append(to_wav(buf, root / tag / f"{tag}_{letter}.wav"))
+            if tag in SEGMENTED:
+                segments = SEGMENTED[tag](p, variant=v)
+                for name, buf in zip(("start", "loop", "end"), segments):
+                    paths.append(to_wav(buf, root / tag / f"{tag}_{name}_{letter}.wav"))
+            else:
+                buf = render(tag, p, variant=v)
+                paths.append(to_wav(buf, root / tag / f"{tag}_{letter}.wav"))
     return paths
 
 
